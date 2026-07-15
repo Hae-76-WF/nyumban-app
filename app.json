@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Nyumban Inspector",
+    "slug": "nyumban-inspector",
+    "version": "1.2.0",
+    "orientation": "portrait",
+    "icon": "./assets/splash.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#dadada"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nyumbanapp.inspector"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/splash.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.nyumbanapp.inspector",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Nyumban Inspector to access your camera to capture property damage and evidence."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "45d0b025-c6b7-4de5-b181-49a6e1faa38a"
+      }
+    }
+  }
+}
