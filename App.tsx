@@ -40,10 +40,11 @@ export default function App() {
             </View>);
     }
 
-    // @ts-ignore
-    return (<PaperProvider theme={theme}>
+    return (
+        <PaperProvider theme={theme as any}>
             <AppContent initialRoute={initialRoute}/>
-        </PaperProvider>);
+        </PaperProvider>
+    );
 }
 
 function AppContent({initialRoute}: { initialRoute: keyof RootStackParamList }) {

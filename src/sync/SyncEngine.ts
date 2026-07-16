@@ -254,7 +254,6 @@ class SyncEngine {
 
   private async syncPhoto(item: QueueItem): Promise<void> {
     const photo: Photo & { inspectionId: string } = item.payload;
-    console.log(`[SyncEngine] Syncing evidence photo ${photo.id}...`);
 
     const formData = new FormData();
     const fileToUpload = {
@@ -298,7 +297,6 @@ class SyncEngine {
 
   private async syncInspection(item: QueueItem): Promise<void> {
     const inspection: Inspection = item.payload;
-    console.log(`[SyncEngine] Syncing inspection ${inspection.id}...`);
 
     // Verify all dependent photo uploads have completed
     const pendingPhotos: string[] = [];

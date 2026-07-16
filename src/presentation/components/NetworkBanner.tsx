@@ -28,7 +28,7 @@ export const NetworkBanner: React.FC = () => {
       return () => clearTimeout(timer);
     });
 
-    unsubscribe();
+    return () => unsubscribe();
   }, [firstLoad]);
 
   return (

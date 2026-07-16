@@ -56,14 +56,14 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
   const [isSyncing, setIsSyncing] = useState(syncEngine.isEngineSyncing());
   const [showQueuePanel, setShowQueuePanel] = useState(false);
 
-  // Subscribe to Sync Queue and online status
+  // Subscribe to updates from the sync engine
   useEffect(() => {
     setIsOnline(syncEngine.isOnline());
     const unsubscribe = syncEngine.subscribe((queue) => {
       setSyncQueue(queue);
       setIsSyncing(syncEngine.isEngineSyncing());
     });
-    unsubscribe();
+    return unsubscribe;
   }, []);
 
   // Fetch properties helper
@@ -439,14 +439,11 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
                                 {item.address}
                               </Text>
                               <View style={styles.badgeRow}>
-                                <Chip style={styles.badgeChip}>
+                                <Chip style={styles.badgeChip} textStyle={styles.chipText}>
                                   {item.unitCount} {item.unitCount === 1 ? 'unit' : 'units'}
                                 </Chip>
-                                <Chip style={styles.badgeChip}>
-                                  Region: {getRegionLabel(item.region)}
-                                </Chip>
-                                <Chip style={styles.badgeChip}>
-                                  V{item.version}
+                                <Chip style={styles.badgeChip} textStyle={styles.chipText}>
+                                  {getRegionLabel(item.region)}
                                 </Chip>
                               </View>
                             </View>

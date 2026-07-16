@@ -56,6 +56,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
           <TextInput
             id="login-email-input"
+            testID="login-email-input"
             label="Email Address"
             value={email}
             onChangeText={(text) => {
@@ -71,6 +72,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
           <TextInput
             id="login-password-input"
+            testID="login-password-input"
             label="Inspector Password"
             value={password}
             onChangeText={(text) => {
@@ -112,7 +114,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           </Button>
 
           <Text variant="bodySmall" style={styles.footer}>
-            Offline-first database activated. Assessments and photo logs will cache securely on your device.
+            Offline access enabled. Your inspections and photos are saved locally and will sync when you have a connection.
           </Text>
         </Card.Content>
       </Card>

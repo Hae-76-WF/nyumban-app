@@ -1,5 +1,5 @@
-import React, {useEffect} from 'react';
-import {StyleSheet, View, Image} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {StyleSheet, View} from 'react-native';
 import {Appbar, useTheme} from 'react-native-paper';
 import {syncEngine} from '../../sync/SyncEngine';
 import {Wifi, WifiOff} from 'lucide-react-native';
@@ -22,38 +22,76 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                                                         children,
                                                     }) => {
     const theme = useTheme();
-    return (<View style={styles.container}>
-        <Appbar.Header
-            elevated={elevated}
-            style={[styles.header, {
-                backgroundColor: theme.colors.surface,
-            },]}
-        >
-            {onBack && <Appbar.BackAction onPress={onBack}/>}
-            <Appbar.Content
-                title={<View style={styles.titleRow}>
-                    <Appbar.Content titleStyle={{fontSize: 20, fontWeight: 'bold', paddingLeft: 6}}
-                                    title={title} subtitle={subtitle} style={{marginLeft: -12}}/>
-                </View>}
-            />
-            {rightActions}
-        </Appbar.Header>
-        {children && <View style={styles.childrenContainer}>{children}</View>}
-    </View>);
+    const [isOnline, setIsOnline] = useState(syncEngine.isOnline());
+
+    useEffect(() => {
+        const unsubscribe = syncEngine.subscribeNetwork((online) => {
+            setIsOnline(online);
+        });
+        return unsubscribe;
+    }, []);
+
+    return (
+        <View style={styles.container}>
+            <Appbar.Header
+                elevated={elevated}
+                style={[styles.header, {
+                    backgroundColor: theme.colors.surface,
+                }]}
+            >
+                {onBack && <Appbar.BackAction onPress={onBack}/>}
+                <Appbar.Content
+                    title={
+                        <View style={styles.titleRow}>
+                            <Appbar.Content
+                                titleStyle={styles.titleStyle}
+                                title={title}
+                                subtitle={subtitle}
+                                style={styles.contentStyle}
+                            />
+                            <View style={styles.statusIcon}>
+                                {isOnline ? (
+                                    <Wifi size={16} color={theme.colors.primary} />
+                                ) : (
+                                    <WifiOff size={16} color={theme.colors.error} />
+                                )}
+                            </View>
+                        </View>
+                    }
+                />
+                {rightActions}
+            </Appbar.Header>
+            {children && <View style={styles.childrenContainer}>{children}</View>}
+        </View>
+    );
 };
 
 const styles = StyleSheet.create({
     container: {
         width: '100%',
-    }, header: {
+    },
+    header: {
         height: 64,
-    }, titleRow: {
-        flexDirection: 'row', alignItems: 'center'
-    }, statusDot: {
-        width: 8, height: 8, borderRadius: 4, marginRight: 8,
-    }, statusIcon: {
-        marginLeft: 4,
-    }, childrenContainer: {
-        backgroundColor: 'white', paddingBottom: 2, borderBottomWidth: 1, borderBottomColor: '#e2e8f0',
+    },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    titleStyle: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    contentStyle: {
+        marginLeft: -8,
+    },
+    statusIcon: {
+        marginLeft: 8,
+        marginTop: 2,
+    },
+    childrenContainer: {
+        backgroundColor: 'white',
+        paddingBottom: 2,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
     },
 });
