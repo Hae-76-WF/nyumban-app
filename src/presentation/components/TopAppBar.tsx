@@ -22,14 +22,6 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                                                         children,
                                                     }) => {
     const theme = useTheme();
-    const [isOnline, setIsOnline] = useState(syncEngine.isOnline());
-
-    useEffect(() => {
-        const unsubscribe = syncEngine.subscribeNetwork((online) => {
-            setIsOnline(online);
-        });
-        return unsubscribe;
-    }, []);
 
     return (
         <View style={styles.container}>
@@ -49,13 +41,6 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                                 subtitle={subtitle}
                                 style={styles.contentStyle}
                             />
-                            <View style={styles.statusIcon}>
-                                {isOnline ? (
-                                    <Wifi size={16} color={theme.colors.primary} />
-                                ) : (
-                                    <WifiOff size={16} color={theme.colors.error} />
-                                )}
-                            </View>
                         </View>
                     }
                 />

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Image } from 'react-native';
-import { Button, TextInput, Text, Card, HelperText, useTheme } from 'react-native-paper';
+import {Button, TextInput, Text, Card, HelperText, useTheme, IconButton} from 'react-native-paper';
 import { loginUseCase } from '../../app/di';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -15,6 +15,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -33,12 +34,6 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleFillDemo = () => {
-    setEmail('agent@nyumban.test');
-    setPassword('Kireka2026!');
-    setError(null);
   };
 
   return (
@@ -68,6 +63,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             keyboardType="email-address"
             disabled={loading}
             style={styles.input}
+            contentStyle={{ fontSize: 15, fontWeight: 'bold'}}
           />
 
           <TextInput
@@ -79,10 +75,14 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               setPassword(text);
               setError(null);
             }}
+            contentStyle={{ fontSize: 15, fontWeight: 'bold'}}
             mode="outlined"
-            secureTextEntry
+            secureTextEntry={!showPassword}
             disabled={loading}
             style={styles.input}
+            right={<TextInput.Icon icon={
+              ()=> <IconButton iconColor={'black'} icon={showPassword ? "eye-off" : "eye"} onPress={() => setShowPassword(!showPassword)} />
+            } />}
           />
 
           {error && (
@@ -101,16 +101,6 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             labelStyle={styles.buttonLabel}
           >
             Sign In To Workspace
-          </Button>
-
-          <Button
-            id="demo-credentials-button"
-            mode="outlined"
-            onPress={handleFillDemo}
-            disabled={loading}
-            style={styles.demoButton}
-          >
-            1-Click Demo Login
           </Button>
 
           <Text variant="bodySmall" style={styles.footer}>

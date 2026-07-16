@@ -23,6 +23,7 @@
       "versionCode":  2,
       "package": "com.nyumbanapp.inspector",
       "permissions": [
+        "android.permission.INTERNET",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ]
