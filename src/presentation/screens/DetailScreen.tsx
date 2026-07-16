@@ -8,15 +8,14 @@ import { DetailSkeleton } from '../components/Skeleton';
 import { propertyRepository, inspectionRepository } from '../../app/di';
 import { Property } from '../../domain/entities/Property';
 import { Inspection } from '../../domain/entities/Inspection';
-import { AppTheme } from '../theme';
+import { AppTheme, theme } from '../theme';
+import { StackScreenProps } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
 
-interface DetailScreenProps {
-  propertyId: string;
-  onBack: () => void;
-  onStartInspection: (propertyId: string, isDraft: boolean) => void;
-}
+type Props = StackScreenProps<RootStackParamList, 'Detail'>;
 
-export const DetailScreen: React.FC<DetailScreenProps> = ({ propertyId, onBack, onStartInspection }) => {
+export const DetailScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { propertyId } = route.params;
   const theme = useTheme<AppTheme>();
 
   const [property, setProperty] = useState<Property | null>(null);
@@ -53,7 +52,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ propertyId, onBack, 
   if (loading) {
     return (
       <View style={styles.container}>
-        <TopAppBar title="Property Profile" onBack={onBack} />
+        <TopAppBar title="Property Profile" onBack={() => navigation.goBack()} />
         <DetailSkeleton />
       </View>
     );
@@ -63,7 +62,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ propertyId, onBack, 
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>Property details not found.</Text>
-        <Button mode="contained" onPress={onBack}>Go Back</Button>
+        <Button mode="contained" onPress={() => navigation.goBack()}>Go Back</Button>
       </View>
     );
   }
@@ -81,7 +80,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ propertyId, onBack, 
 
   return (
     <View style={styles.container}>
-      <TopAppBar title="Property Profile" onBack={onBack} />
+      <TopAppBar title="Property Profile" onBack={() => navigation.goBack()} />
       <ScrollView>
         {/* Primary info card */}
         <Card style={styles.card} mode="outlined">
@@ -89,7 +88,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ propertyId, onBack, 
             <View style={styles.badgeRow}>
               <Chip
                 style={[styles.statusChip, { backgroundColor: getStatusColor(property.status) + '15' }]}
-                textStyle={{ color: getStatusColor(property.status), fontWeight: '600' }}
+                textStyle={{ color: getStatusColor(property.status), fontWeight: 'bold', fontSize: 10 }}
               >
                 ● {property.status.toUpperCase()}
               </Chip>
@@ -97,19 +96,19 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ propertyId, onBack, 
               <Chip style={styles.chip}>V{property.version}</Chip>
             </View>
 
-            <Text variant="headlineSmall" style={styles.propName}>{property.name}</Text>
-            <Text variant="bodyLarge" style={styles.propAddr}>{property.address}</Text>
+            <Text style={styles.propName}>{property.name}</Text>
+            <Text style={styles.propAddr}>{property.address}</Text>
 
             <Divider style={styles.divider} />
 
             <View style={styles.metaRow}>
               <View style={styles.metaCol}>
                 <Text variant="labelMedium" style={styles.metaLabel}>Total Configured Units</Text>
-                <Text variant="titleLarge" style={styles.metaVal}>{property.unitCount}</Text>
+                <Text style={styles.metaVal}>{property.unitCount}</Text>
               </View>
               <View style={styles.metaCol}>
                 <Text variant="labelMedium" style={styles.metaLabel}>Last Assessment Date</Text>
-                <Text variant="titleLarge" style={styles.metaVal}>
+                <Text style={styles.metaVal}>
                   {property.lastInspectedAt ? new Date(property.lastInspectedAt).toLocaleDateString() : 'Never'}
                 </Text>
               </View>
@@ -120,7 +119,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ propertyId, onBack, 
         {/* Room layout list */}
         <Card style={styles.card} mode="outlined">
           <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Physical Floor & Room Config</Text>
+            <Text style={styles.sectionTitle}>Physical Floor & Room Config</Text>
             <Text variant="bodySmall" style={styles.sectionSubtitle}>
               These rooms represent the structural assets requiring physical condition logging.
             </Text>
@@ -148,13 +147,13 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ propertyId, onBack, 
         <View style={styles.ctaContainer}>
           {draft ? (
             <View style={styles.draftBox}>
-              <Text variant="bodyMedium" style={styles.draftText}>
-                ⚠️ Unfinished Draft Found! Last modified on {new Date(draft.completedAt * 1000).toLocaleTimeString()}.
+              <Text style={styles.draftText}>
+                Unfinished Draft Found! Last modified on {new Date(draft.completedAt * 1000).toLocaleTimeString()}.
               </Text>
               <Button
                 id="begin-inspection-button"
                 mode="contained"
-                onPress={() => onStartInspection(property.id, true)}
+                onPress={() => navigation.navigate('Inspection', { propertyId: property.id, isDraft: true })}
                 style={styles.ctaBtn}
               >
                 Resume Inspection Draft
@@ -165,7 +164,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ propertyId, onBack, 
               id="begin-inspection-button"
               mode="contained"
               disabled={property.rooms.length === 0}
-              onPress={() => onStartInspection(property.id, false)}
+              onPress={() => navigation.navigate('Inspection', { propertyId: property.id, isDraft: false })}
               style={styles.ctaBtn}
             >
               Start New Property Assessment
@@ -218,6 +217,7 @@ const styles = StyleSheet.create({
   },
   badgeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginBottom: 12,
   },
   statusChip: {
@@ -228,7 +228,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
   },
   propName: {
-    fontWeight: '600',
+    fontWeight: 'bold',
+    fontSize: 18,
     color: '#0f172a',
     marginBottom: 6,
   },
@@ -251,11 +252,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   metaVal: {
-    fontWeight: '600',
+    fontWeight: 'semibold',
     color: '#1e293b',
   },
   sectionTitle: {
-    fontWeight: '600',
+    fontWeight: 'semibold',
     color: '#1e293b',
   },
   sectionSubtitle: {
@@ -282,7 +283,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   draftText: {
-    color: '#1e40af',
+    color: theme.colors.secondary,
     marginBottom: 12,
     fontWeight: '500',
   },

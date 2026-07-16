@@ -4,12 +4,12 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Image } from 'react-native';
 import { Button, TextInput, Text, Card, HelperText, useTheme } from 'react-native-paper';
 import { loginUseCase } from '../../app/di';
+import { StackScreenProps } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
 
-interface LoginScreenProps {
-  onLoginSuccess: () => void;
-}
+type Props = StackScreenProps<RootStackParamList, 'Login'>;
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const theme = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +26,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     try {
       await loginUseCase.execute(email.trim(), password);
-      onLoginSuccess();
+      navigation.replace('Portfolio');
     } catch (err: any) {
       const msg = err?.data?.error || err?.message || 'Login failed. Please check credentials.';
       setError(msg);

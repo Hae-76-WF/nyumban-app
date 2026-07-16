@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nyumban Inspector",
     "slug": "nyumban-inspector",
-    "version": "1.2.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/splash.png",
     "userInterfaceStyle": "light",
@@ -17,17 +17,15 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/splash.png",
+        "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
       },
+      "versionCode":  2,
       "package": "com.nyumbanapp.inspector",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ]
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       [

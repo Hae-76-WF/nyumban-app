@@ -25,13 +25,13 @@ import { Property, PropertyRegion, PropertyStatus } from '../../domain/entities/
 import { QueueItem } from '../../domain/entities/SyncState';
 import { syncEngine } from '../../sync/SyncEngine';
 import {Icon, WifiIcon, WifiOffIcon} from "lucide-react-native";
+import { StackScreenProps } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
+import { authRepository } from '../../app/di';
 
-interface PortfolioScreenProps {
-  onSelectProperty: (propertyId: string) => void;
-  onLogout: () => void;
-}
+type Props = StackScreenProps<RootStackParamList, 'Portfolio'>;
 
-export const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ onSelectProperty, onLogout }) => {
+export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
   const theme = useTheme();
 
   // States
@@ -304,7 +304,7 @@ export const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ onSelectProper
               iconColor={theme.colors.primary}
               size={34}
               onPress={() => setFilterModalVisible(true)}
-              style={styles.filterIconButton}
+              style={[styles.filterIconButton, { elevation: 1}]}
             />
             <Searchbar
               id="property-search-input"
@@ -312,10 +312,10 @@ export const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ onSelectProper
               onChangeText={setSearchQuery}
               value={searchQuery}
               style={styles.searchBar}
-              elevation={1}
+              elevation={0}
               inputStyle={{
                 fontSize: 14,
-                fontWeight: '400'
+                fontWeight: 'semibold'
               }}
             />
           </View>
@@ -392,85 +392,104 @@ export const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ onSelectProper
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setLogoutDialogVisible(false)}>Cancel</Button>
-            <Button onPress={() => {
+            <Button onPress={async () => {
               setLogoutDialogVisible(false);
-              onLogout();
+              await authRepository.logout();
+              navigation.replace('Login');
             }}>Logout</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
 
       {/* Main FlatList */}
-      <FlatList
-        data={loading && properties.length === 0 ? [] : properties}
-        keyExtractor={(item, index) => typeof item === 'number' ? `skeleton-${index}` : item.id}
-        renderItem={({ item }) => {
-          if (typeof item === 'number') {
-            return <PropertyCardSkeleton />;
-          }
-          return (
-            <Card
-              id={`property-card-${item.id}`}
-              style={styles.propCard}
-              mode="contained"
-              onPress={() => onSelectProperty(item.id)}
-            >
-              <Card.Content>
-                <View style={styles.propRow}>
-                  <View style={styles.propMain}>
-                    <Text variant="titleMedium" style={styles.propName}>
-                      {item.name}
-                    </Text>
-                    <Text variant="bodySmall" style={styles.propAddr}>
-                      {item.address}
-                    </Text>
-                    <View style={styles.badgeRow}>
-                      <Chip style={styles.badgeChip}>
-                        {item.unitCount} {item.unitCount === 1 ? 'unit' : 'units'}
-                      </Chip>
-                      <Chip style={styles.badgeChip}>
-                        Region: {getRegionLabel(item.region)}
-                      </Chip>
-                      <Chip style={styles.badgeChip}>
-                        V{item.version}
-                      </Chip>
-                    </View>
-                  </View>
+      {
+        loading ? (
+            <FlatList
+                data={[1,2,3,4,5,6,7]}
+                keyExtractor={(item, index) => `skeleton-${index}`}
+                renderItem={({ item }) => {
+                    return <PropertyCardSkeleton />;
+                }}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} />
+                }
+                onEndReachedThreshold={0.4}
+                contentContainerStyle={styles.listContent}
+            />
 
-                  <View style={styles.propRight}>
-                    <Text
-                      variant="bodySmall"
-                      style={[styles.statusText, { color: getStatusColor(item.status) }]}
-                    >
-                      ● {item.status.toUpperCase()}
-                    </Text>
-                    {item.lastInspectedAt && (
-                      <Text variant="labelSmall" style={styles.lastInspected}>
-                        Last: {new Date(item.lastInspectedAt).toLocaleDateString()}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              </Card.Content>
-            </Card>
-          );
-        }}
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                No properties found matching filters.
-              </Text>
-            </View>
-          ) : null
-        }
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} />
-        }
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.4}
-        contentContainerStyle={styles.listContent}
-      />
+          ) : (
+            <FlatList
+                data={properties}
+                keyExtractor={(item, index) => item.id}
+                renderItem={({ item }) => {
+                  return (
+                      <Card
+                          id={`property-card-${item.id}`}
+                          style={styles.propCard}
+                          mode="contained"
+                          onPress={() => navigation.navigate('Detail', { propertyId: item.id })}
+                      >
+                        <Card.Content>
+                          <View style={styles.propRow}>
+                            <View style={styles.propMain}>
+                              <Text variant="titleMedium" style={styles.propName}>
+                                {item.name}
+                              </Text>
+                              <Text variant="bodySmall" style={styles.propAddr}>
+                                {item.address}
+                              </Text>
+                              <View style={styles.badgeRow}>
+                                <Chip style={styles.badgeChip}>
+                                  {item.unitCount} {item.unitCount === 1 ? 'unit' : 'units'}
+                                </Chip>
+                                <Chip style={styles.badgeChip}>
+                                  Region: {getRegionLabel(item.region)}
+                                </Chip>
+                                <Chip style={styles.badgeChip}>
+                                  V{item.version}
+                                </Chip>
+                              </View>
+                            </View>
+
+                            <View style={styles.propRight}>
+                              <Text
+                                  variant="bodySmall"
+                                  style={[styles.statusText, { color: getStatusColor(item.status) }]}
+                              >
+                                ● {item.status.toUpperCase()}
+                              </Text>
+                              {item.lastInspectedAt && (
+                                  <Text variant="labelSmall" style={styles.lastInspected}>
+                                    Last: {new Date(item.lastInspectedAt).toLocaleDateString()}
+                                  </Text>
+                              )}
+                            </View>
+                          </View>
+                        </Card.Content>
+                      </Card>
+                  );
+                }}
+                ListEmptyComponent={
+                  !loading ? (
+                      <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyText}>
+                          No properties found matching filters.
+                        </Text>
+                      </View>
+                  ) : null
+                }
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} />
+                }
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.4}
+                contentContainerStyle={styles.listContent}
+            />
+
+        )
+      }
+
+
       {/* Network Connectivity Switch Banner - REMOVED, replaced by NetworkBanner */}
     </View>
   );
@@ -640,7 +659,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   listContent: {
-    padding: 12,
+    padding: 6,
   },
   propCard: {
     marginBottom: 10,

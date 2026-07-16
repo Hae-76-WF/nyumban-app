@@ -13,7 +13,7 @@ import {
   Snackbar,
   Dialog,
   Portal,
-  Appbar,
+  Appbar, Chip,
 } from 'react-native-paper';
 import { TopAppBar } from '../components/TopAppBar';
 import { InspectionSkeleton } from '../components/Skeleton';
@@ -24,15 +24,14 @@ import { Photo } from '../../domain/entities/Photo';
 import * as ImagePicker from 'expo-image-picker';
 import { AppTheme } from '../theme';
 import syncEngine from "../../sync/SyncEngine";
-import {DraftingCompassIcon} from "lucide-react-native";
+import {DraftingCompassIcon, Save} from "lucide-react-native";
+import { StackScreenProps } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
 
-interface InspectionScreenProps {
-  propertyId: string;
-  isDraft: boolean;
-  onClose: () => void;
-}
+type Props = StackScreenProps<RootStackParamList, 'Inspection'>;
 
-export const InspectionScreen: React.FC<InspectionScreenProps> = ({ propertyId, isDraft, onClose }) => {
+export const InspectionScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { propertyId, isDraft } = route.params;
   const theme = useTheme<AppTheme>();
 
   const [property, setProperty] = useState<Property | null>(null);
@@ -126,7 +125,7 @@ export const InspectionScreen: React.FC<InspectionScreenProps> = ({ propertyId, 
   if (loading || !property) {
     return (
       <View style={styles.container}>
-        <TopAppBar title="Assessment" onBack={onClose} />
+        <TopAppBar title="Assessment" onBack={() => navigation.goBack()} />
         <InspectionSkeleton />
       </View>
     );
@@ -198,22 +197,20 @@ export const InspectionScreen: React.FC<InspectionScreenProps> = ({ propertyId, 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
+      allowsMultipleSelection: true,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
-      const newPhotoId = `pht_local_${Math.random().toString(36).substr(2, 9)}`;
-
-      const newPhoto: Photo = {
-        id: newPhotoId,
+      const newPhotos: Photo[] = result.assets.map((asset) => ({
+        id: `pht_local_${Math.random().toString(36).substr(2, 9)}`,
         localUri: asset.uri,
         remoteId: null,
         status: 'pending',
-      };
+      }));
 
       const currentPhotos = activeState.localPhotos || [];
       updateActiveRoomState({
-        localPhotos: [...currentPhotos, newPhoto],
+        localPhotos: [...currentPhotos, ...newPhotos],
       });
     }
   };
@@ -251,7 +248,7 @@ export const InspectionScreen: React.FC<InspectionScreenProps> = ({ propertyId, 
     };
     await inspectionRepository.saveDraft(propertyId, draftPayload);
     setExitDialogVisible(false);
-    onClose();
+    navigation.goBack();
   };
 
   const handleCompleteAssessment = async () => {
@@ -280,7 +277,7 @@ export const InspectionScreen: React.FC<InspectionScreenProps> = ({ propertyId, 
       // 3. Send to background queue
       // Note: repository handles nesting of photos into the queue automatically
       await syncEngine.queueInspection(submission);
-      onClose();
+      navigation.goBack();
     } catch (e: any) {
       console.error('[Inspection] submission failed:', e);
       setSnackbarMessage(e.message || 'Submission failed. Please try again.');
@@ -299,20 +296,17 @@ export const InspectionScreen: React.FC<InspectionScreenProps> = ({ propertyId, 
         rightActions={
           <Appbar.Action
             style={{ width: 50 }}
-            icon={() => <DraftingCompassIcon color={'black'} />}
+            icon={() => <Save color={'black'} />}
             onPress={handleSaveDraftAndExit}
           />
         }
       />
 
       {/* Property name and type */ }
-      <View style={{ gap: 4, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#f8fafc'}}>
-        <Text variant="titleMedium" style={styles.title}>{property.name}</Text>
-        <Text variant="bodySmall" style={[styles.headerSub, { fontSize: 10}]}>V{property.version} • {inspectionType.toUpperCase()}</Text>
-      </View>
+      <View style={{ gap: 4, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#ffffff'}}>
+        <Text style={styles.title}>{property.name}</Text>
+        <Text variant="bodySmall" style={[styles.headerSub, { fontSize: 10, paddingBottom: 6}]}>V{property.version} • {inspectionType.toUpperCase()}</Text>
 
-      {/* Progress indicators */}
-      <View style={[styles.progressBarRow, { marginTop: 10}]}>
         <ProgressBar id="inspection-progress" progress={progressPercent} color={theme.colors.success} style={styles.bar} />
         <View style={styles.progressLabelRow}>
           <Text variant="bodySmall" style={styles.progressLabel}>
@@ -375,7 +369,7 @@ export const InspectionScreen: React.FC<InspectionScreenProps> = ({ propertyId, 
               />
 
               {/* Notes Input */}
-              <Text variant="labelMedium" style={styles.label}>Evidence Annotations & Notes</Text>
+              <Text style={styles.label}>Evidence Annotations & Notes</Text>
               <TextInput
                 id="room-notes-input"
                 mode="outlined"
@@ -383,27 +377,30 @@ export const InspectionScreen: React.FC<InspectionScreenProps> = ({ propertyId, 
                 onChangeText={handleNotesChange}
                 placeholder="Describe paint peeling, water damage, electrical fittings, dampness index, etc."
                 multiline
-                numberOfLines={4}
+                numberOfLines={8}
                 style={styles.notesInput}
+                contentStyle={{
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                }}
               />
 
               {/* Photo Upload evidence pipeline */}
               <Divider style={styles.divider} />
               <View style={styles.photoHeaderRow}>
-                <Text variant="titleMedium" style={styles.photoTitle}>Evidence Logs</Text>
+                <Text style={styles.photoTitle}>Evidence Logs</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <IconButton
-                    icon="camera"
-                    mode="outlined"
-                    size={20}
-                    onPress={handleTakePhoto}
-                  />
-                  <IconButton
+                  <Chip icon={'camera'} onPress={handleTakePhoto}>
+                    Capture
+                  </Chip>
+
+                  <Chip
                     icon="image-plus"
                     mode="outlined"
-                    size={20}
                     onPress={handlePickImage}
-                  />
+                  >
+                    Gallery
+                  </Chip>
                 </View>
               </View>
 
@@ -610,8 +607,11 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   notesInput: {
+    paddingVertical: 16,
     backgroundColor: '#ffffff',
     marginBottom: 10,
+    fontSize: 14,
+    fontWeight: 'semibold'
   },
   photoHeaderRow: {
     flexDirection: 'row',

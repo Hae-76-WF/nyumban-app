@@ -8,7 +8,7 @@ import { localDB } from '../local/storage';
 export class InspectionRepositoryImpl implements InspectionRepository {
   async getDraft(propertyId: string): Promise<Inspection | null> {
     const draft = localDB.getDraftInspection(propertyId);
-    return draft as any; // Cast as types are identical structurally
+    return draft as any;
   }
 
   async saveDraft(propertyId: string, inspection: Inspection): Promise<void> {

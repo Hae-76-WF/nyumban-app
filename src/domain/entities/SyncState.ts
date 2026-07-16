@@ -1,5 +1,3 @@
-
-
 export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed' | 'conflict';
 
 export interface QueueItem {

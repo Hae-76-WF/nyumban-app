@@ -22,16 +22,6 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                                                         children,
                                                     }) => {
     const theme = useTheme();
-    const [isOnline, setIsOnline] = React.useState(syncEngine.isOnline());
-
-    useEffect(() => {
-        const unsubscribe = syncEngine.subscribeNetwork((online) => {
-            setIsOnline(online);
-        });
-
-        unsubscribe();
-    }, []);
-
     return (<View style={styles.container}>
         <Appbar.Header
             elevated={elevated}
@@ -42,14 +32,8 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
             {onBack && <Appbar.BackAction onPress={onBack}/>}
             <Appbar.Content
                 title={<View style={styles.titleRow}>
-                    <Image
-                        source={require('../../../assets/splash.png')}
-                        style={{width: 50, height: 50, marginRight: 8}}
-                    />
-                    <Appbar.Content titleStyle={{fontSize: 20, fontWeight: 'bold', color: theme.colors.secondary}}
+                    <Appbar.Content titleStyle={{fontSize: 20, fontWeight: 'bold', paddingLeft: 6}}
                                     title={title} subtitle={subtitle} style={{marginLeft: -12}}/>
-                    {isOnline ? (<Wifi size={20} color={theme.colors.primary} style={styles.statusIcon}/>) : (
-                        <WifiOff size={20} color={theme.colors.error} style={styles.statusIcon}/>)}
                 </View>}
             />
             {rightActions}

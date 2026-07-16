@@ -1,50 +1,28 @@
 import React, {useEffect, useState} from 'react';
-import {ActivityIndicator, Image, SafeAreaView, StatusBar, StyleSheet, View} from 'react-native';
-import {Provider as PaperProvider, Text, useTheme} from 'react-native-paper';
+import {Image, SafeAreaView, StatusBar, StyleSheet, View} from 'react-native';
+import {Provider as PaperProvider, useTheme} from 'react-native-paper';
+import {NavigationContainer} from '@react-navigation/native';
 import {theme} from './src/presentation/theme';
 import {useFonts} from 'expo-font';
-
-// Screens
-import {LoginScreen} from './src/presentation/screens/LoginScreen';
-import {PortfolioScreen} from './src/presentation/screens/PortfolioScreen';
-import {DetailScreen} from './src/presentation/screens/DetailScreen';
-import {InspectionScreen} from './src/presentation/screens/InspectionScreen';
-
-// Core Repositories & Sync Engine
+import {RootNavigator, RootStackParamList} from './src/presentation/navigation/RootNavigator';
 import {authRepository} from './src/app/di';
+import 'react-native-gesture-handler';
 
 export default function App() {
     const [fontsLoaded] = useFonts({
         'montserrat': require('./assets/fonts/montserrat.ttf'),
     });
-
-    if (!fontsLoaded) {
-        return <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
-            <Image source={require('./assets/splash.png')} style={{width: 100, height: 100}}/>
-        </View>;
-    }
-
-    // @ts-ignore
-    return (<PaperProvider theme={theme}>
-            <AppContent/>
-        </PaperProvider>);
-}
-
-function AppContent() {
     const paperTheme = useTheme();
+    const [initialRoute, setInitialRoute] = useState<'Login' | 'Portfolio'>('Login');
     const [isReady, setIsReady] = useState(false);
-    const [currentScreen, setCurrentScreen] = useState<'login' | 'portfolio' | 'detail' | 'inspection'>('login');
-    const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
-    const [isInspectionDraft, setIsInspectionDraft] = useState(false);
 
-    // 1. Initialize persistent repositories on app boot
     useEffect(() => {
         async function bootApp() {
             try {
                 await authRepository.initialize();
                 const loggedIn = await authRepository.isLoggedIn();
                 if (loggedIn) {
-                    setCurrentScreen('portfolio');
+                    setInitialRoute('Portfolio');
                 }
             } catch (e) {
                 console.error('[App] Failed to initialize persistent DB state:', e);
@@ -56,51 +34,26 @@ function AppContent() {
         bootApp();
     }, []);
 
-    if (!isReady) {
-        return (<View style={[styles.splashScreen, {backgroundColor: paperTheme.colors.secondary}]}>
-                <ActivityIndicator size="large" color={paperTheme.colors.primary}/>
-                <Text style={[styles.splashText, {color: '#94a3b8'}]}>
-                    Booting Nyumban Inspector Workspace...
-                </Text>
+    if (!fontsLoaded || !isReady) {
+        return (<View style={[styles.splashScreen, {backgroundColor: paperTheme.colors.background}]}>
+                <Image source={require('./assets/splash.png')} style={{width: 200, height: 200, objectFit: 'contain'}}/>
             </View>);
     }
 
+    // @ts-ignore
+    return (<PaperProvider theme={theme}>
+            <AppContent initialRoute={initialRoute}/>
+        </PaperProvider>);
+}
+
+function AppContent({initialRoute}: { initialRoute: keyof RootStackParamList }) {
+    const paperTheme = useTheme();
+
     return (<SafeAreaView style={[styles.container, {backgroundColor: paperTheme.colors.background}]}>
             <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent/>
-
-            {currentScreen === 'login' && (<LoginScreen onLoginSuccess={() => setCurrentScreen('portfolio')}/>)}
-
-            {currentScreen === 'portfolio' && (<PortfolioScreen
-                    onSelectProperty={(id) => {
-                        setSelectedPropertyId(id);
-                        setCurrentScreen('detail');
-                    }}
-                    onLogout={async () => {
-                        await authRepository.logout();
-                        setCurrentScreen('login');
-                    }}
-                />)}
-
-            {currentScreen === 'detail' && selectedPropertyId && (<DetailScreen
-                    propertyId={selectedPropertyId}
-                    onBack={() => {
-                        setSelectedPropertyId(null);
-                        setCurrentScreen('portfolio');
-                    }}
-                    onStartInspection={(id, isDraft) => {
-                        setSelectedPropertyId(id);
-                        setIsInspectionDraft(isDraft);
-                        setCurrentScreen('inspection');
-                    }}
-                />)}
-
-            {currentScreen === 'inspection' && selectedPropertyId && (<InspectionScreen
-                    propertyId={selectedPropertyId}
-                    isDraft={isInspectionDraft}
-                    onClose={() => {
-                        setCurrentScreen('detail');
-                    }}
-                />)}
+            <NavigationContainer>
+                <RootNavigator initialRouteName={initialRoute}/>
+            </NavigationContainer>
         </SafeAreaView>);
 }
 

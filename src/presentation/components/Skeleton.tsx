@@ -56,12 +56,12 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 export const PropertyCardSkeleton = () => {
   return (
     <View style={skeletonStyles.card}>
-      <Skeleton height={150} borderRadius={12} style={{ marginBottom: 12 }} />
-      <Skeleton width="60%" height={24} style={{ marginBottom: 8 }} />
-      <Skeleton width="40%" height={16} style={{ marginBottom: 12 }} />
+      <Skeleton height={100} borderRadius={12} style={{ marginBottom: 12 }} />
+      <Skeleton width="60%" height={16} style={{ marginBottom: 8 }} />
+      <Skeleton width="40%" height={9} style={{ marginBottom: 12 }} />
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Skeleton width={80} height={32} borderRadius={16} />
-        <Skeleton width={80} height={32} borderRadius={16} />
+        <Skeleton width={80} height={20} borderRadius={16} />
+        <Skeleton width={80} height={20} borderRadius={16} />
       </View>
     </View>
   );
@@ -69,7 +69,7 @@ export const PropertyCardSkeleton = () => {
 
 export const DetailSkeleton = () => {
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 16 }}>
+    <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 6 }}>
       <View style={skeletonStyles.card}>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
           <Skeleton width={80} height={24} borderRadius={12} />
@@ -137,9 +137,8 @@ const skeletonStyles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    marginHorizontal: 16,
+    padding: 6,
+    marginBottom: 6,
     elevation: 2,
   },
 });
