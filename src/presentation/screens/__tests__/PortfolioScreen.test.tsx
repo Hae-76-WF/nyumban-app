@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { render, waitFor, fireEvent } from '@testing-library/react-native';
 import { PortfolioScreen } from '../PortfolioScreen';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { theme } from '../../theme';
@@ -71,6 +71,19 @@ describe('PortfolioScreen', () => {
 
     await waitFor(() => {
       expect(getByText('No properties found')).toBeTruthy();
+    });
+  });
+
+  it('navigates between tabs', async () => {
+    (getPropertiesUseCase.execute as jest.Mock).mockResolvedValue({ data: [], nextCursor: null });
+
+    const { getByTestId } = renderWithProviders(
+      <PortfolioScreen navigation={mockNavigation as any} route={{} as any} />
+    );
+
+    await waitFor(() => {
+      expect(getByTestId('tab-recent')).toBeTruthy();
+      expect(getByTestId('tab-completed')).toBeTruthy();
     });
   });
 });

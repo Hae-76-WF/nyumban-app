@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import {View, StyleSheet, FlatList, RefreshControl, ScrollView, Platform, StatusBar, SectionList, Image} from 'react-native';
+import {View, StyleSheet, FlatList, RefreshControl, ScrollView, Platform, StatusBar, SectionList, Image, useWindowDimensions} from 'react-native';
 import {
   Text,
   Searchbar,
@@ -18,6 +18,7 @@ import {
   Dialog,
   Menu,
 } from 'react-native-paper';
+import { BottomNavigation } from 'react-native-paper';
 import { TopAppBar } from '../components/TopAppBar';
 import { NetworkBanner } from '../components/NetworkBanner';
 import { PropertyCardSkeleton } from '../components/Skeleton';
@@ -37,6 +38,9 @@ type Props = StackScreenProps<RootStackParamList, 'Portfolio'>;
 export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
   const theme = useTheme();
 
+  const { width } = useWindowDimensions();
+  const isSmallScreen = width < 400;
+
   // States
   const [properties, setProperties] = useState<Property[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<Property[]>([]);
@@ -50,6 +54,14 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
+
+  // Tab state
+  const [index, setIndex] = useState(0);
+  const [routes] = useState([
+    { key: 'all', title: 'All', focusedIcon: 'home', unfocusedIcon: 'home-outline', testID: 'tab-all' },
+    { key: 'recent', title: 'Recent', focusedIcon: 'clock', unfocusedIcon: 'clock-outline', testID: 'tab-recent' },
+    { key: 'completed', title: 'Completed', focusedIcon: 'check-circle', unfocusedIcon: 'check-circle-outline', testID: 'tab-completed' },
+  ]);
 
   // Sync state
   const [syncQueue, setSyncQueue] = useState<QueueItem[]>([]);
@@ -212,10 +224,39 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
     navigation.replace('Login');
   };
 
-  const renderPropertyItem = (item: Property) => {
+  const renderPropertyItem = (item: Property, isVertical = false) => {
     const draft = drafts[item.id];
     const pendingSync = syncQueue.find(q => q.type === 'inspection' && q.payload.propertyId === item.id);
     const isCompleted = !!item.lastInspectedAt && !pendingSync;
+
+    if (isVertical) {
+      return (
+        <Card
+          id={`property-card-${item.id}`}
+          style={[styles.propCard, styles.verticalCard, isSmallScreen && { width: (width - 24) / 2 }]}
+          mode="contained"
+          onPress={() => navigation.navigate('Detail', { propertyId: item.id })}
+        >
+          <Card.Content style={{ padding: 8 }}>
+            <Text variant="titleSmall" numberOfLines={2} style={styles.propName}>
+              {item.name}
+            </Text>
+            <Text variant="bodySmall" numberOfLines={2} style={[styles.propAddr, { fontSize: 10, height: 32 }]}>
+              {item.address || 'Address not available'}
+            </Text>
+
+            <View style={{ marginTop: 2, flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
+              <Chip style={[styles.badgeChip]} textStyle={{ fontSize: 9 }}>
+                Units: {item.unitCount ?? 'N/A'}
+              </Chip>
+              {isCompleted && (
+                <IconButton icon="check-circle" iconColor="#15803d" size={16} style={{ margin: 0 }} />
+              )}
+            </View>
+          </Card.Content>
+        </Card>
+      );
+    }
 
     return (
       <Card
@@ -284,18 +325,94 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const sections = [
-    { title: 'Pending Upload Online', data: properties.filter(p => syncQueue.some(q => q.type === 'inspection' && q.payload.propertyId === p.id)) },
-    { title: 'Inspection In Progress', data: properties.filter(p => !!drafts[p.id]) },
-    { title: 'Recently Completed', data: properties.filter(p => !!p.lastInspectedAt && !syncQueue.some(q => q.type === 'inspection' && q.payload.propertyId === p.id)) },
-    { title: 'Recently Viewed', data: recentlyViewed },
-    { title: 'All Properties', data: properties },
-  ].filter(s => s.data.length > 0);
+  const AllPropertiesRoute = () => {
+    const sections = [
+      { title: 'Pending Upload Online', data: properties.filter(p => syncQueue.some(q => q.type === 'inspection' && q.payload.propertyId === p.id)) },
+      { title: 'All Properties', data: properties },
+    ].filter(s => s.data.length > 0);
 
-  // We want to avoid duplicates in 'All Properties' if they are in other sections?
-  // Actually, usually user wants to see them in sections AND maybe all.
-  // But the prompt says "different section for...", let's make them unique-ish or just sections.
-  // Using SectionList is better.
+    return loading ? (
+      <FlatList
+        data={[1, 2, 3, 4, 5, 6, 7]}
+        keyExtractor={(item, index) => `skeleton-${index}`}
+        renderItem={() => <PropertyCardSkeleton />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} />
+        }
+        contentContainerStyle={styles.listContent}
+      />
+    ) : (
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => renderPropertyItem(item)}
+        renderSectionHeader={({ section: { title } }) => (
+          <Text variant="labelMedium" style={styles.sectionHeader}>{title}</Text>
+        )}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} />
+        }
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.4}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text variant="titleMedium" style={styles.emptyText}>No properties found</Text>
+            <Button mode="outlined" onPress={() => loadProperties()} style={{ marginTop: 12 }}>
+              Reload
+            </Button>
+          </View>
+        }
+      />
+    );
+  };
+
+  const RecentRoute = () => (
+    <FlatList
+      data={recentlyViewed}
+      keyExtractor={(item) => `recent-${item.id}`}
+      renderItem={({ item }) => renderPropertyItem(item)}
+      contentContainerStyle={styles.listContent}
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <Text variant="titleMedium" style={styles.emptyText}>No recently viewed properties</Text>
+        </View>
+      }
+    />
+  );
+
+  const CompletedRoute = () => {
+    const completedProperties = properties.filter(p => !!p.lastInspectedAt && !syncQueue.some(q => q.type === 'inspection' && q.payload.propertyId === p.id));
+
+    return (
+      <FlatList
+        data={completedProperties}
+        keyExtractor={(item) => `completed-${item.id}`}
+        renderItem={({ item }) => renderPropertyItem(item, true)}
+        numColumns={isSmallScreen ? 2 : 1}
+        key={isSmallScreen ? 'h' : 'v'}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text variant="titleMedium" style={styles.emptyText}>No completed inspections found</Text>
+          </View>
+        }
+      />
+    );
+  };
+
+  const renderScene = ({ route }: any) => {
+    switch (route.key) {
+      case 'all':
+        return <AllPropertiesRoute />;
+      case 'recent':
+        return <RecentRoute />;
+      case 'completed':
+        return <CompletedRoute />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -310,6 +427,7 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
             indeterminate={isSyncing}
             progress={isSyncing ? undefined : 0}
             color={theme.colors.primary}
+            style={{ height: 2, marginBottom: 8 }}
           />
           <Card style={styles.syncCard} mode="outlined">
             <Card.Content style={styles.syncHeader}>
@@ -475,6 +593,7 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.searchRow}>
             <IconButton
               icon="filter-variant"
+              id="filter-btn"
               mode="contained"
               containerColor={theme.colors.secondary}
               iconColor={theme.colors.primary}
@@ -583,47 +702,14 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
         </Dialog>
       </Portal>
 
-      {/* Main SectionList */}
-      {
-        loading ? (
-            <FlatList
-                data={[1,2,3,4,5,6,7]}
-                keyExtractor={(item, index) => `skeleton-${index}`}
-                renderItem={() => <PropertyCardSkeleton />}
-                refreshControl={
-                  <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} />
-                }
-                onEndReachedThreshold={0.4}
-                contentContainerStyle={styles.listContent}
-            />
-          ) : (
-            <SectionList
-              sections={sections}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => renderPropertyItem(item)}
-              renderSectionHeader={({ section: { title } }) => (
-                <Text variant="labelMedium" style={styles.sectionHeader}>{title}</Text>
-              )}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} />
-              }
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.4}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text variant="titleMedium" style={styles.emptyText}>No properties found</Text>
-                  <Button mode="outlined" onPress={() => loadProperties()} style={{ marginTop: 12 }}>
-                    Reload
-                  </Button>
-                </View>
-              }
-            />
-        )
-      }
-
-
-      {/* Network Connectivity Switch Banner - REMOVED, replaced by NetworkBanner */}
+      {/* Main Content with Tabs */}
+      <BottomNavigation
+        navigationState={{ index, routes }}
+        onIndexChange={setIndex}
+        renderScene={renderScene}
+        barStyle={{ backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e2e8f0' }}
+        safeAreaInsets={{ bottom: 0 }}
+      />
     </View>
   );
 };
@@ -800,6 +886,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+  },
+  verticalCard: {
+    margin: 4,
+    flex: 1,
   },
   propRow: {
     flexDirection: 'row',

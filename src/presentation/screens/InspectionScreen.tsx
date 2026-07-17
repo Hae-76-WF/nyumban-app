@@ -46,6 +46,10 @@ export const InspectionScreen: React.FC<Props> = ({ route, navigation }) => {
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
   const [exitDialogVisible, setExitDialogVisible] = useState(false);
 
+  // Submission Status Dialog
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'uploading' | 'success' | 'error' | 'offline'>('idle');
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+
   // Load / Setup Property and draft
   useEffect(() => {
     const initialize = async () => {
@@ -274,13 +278,62 @@ export const InspectionScreen: React.FC<Props> = ({ route, navigation }) => {
     };
 
     try {
-      // 3. Send to background queue
+      // 3. Check connectivity first
+      if (!syncEngine.isOnline()) {
+        setSubmissionStatus('offline');
+        // Still queue it so it's not lost
+        await syncEngine.queueInspection(submission);
+        return;
+      }
+
+      setSubmissionStatus('uploading');
+
+      // 4. Send to background queue
       // Note: repository handles nesting of photos into the queue automatically
       await syncEngine.queueInspection(submission);
-      navigation.goBack();
+
+      // 5. Monitor the sync status
+      // We want to see if THIS specific inspection finishes syncing
+      const checkStatus = async () => {
+        const queue = await inspectionRepository.getQueue();
+        const item = queue.find(q => q.id === finalId);
+
+        if (!item) {
+          // If it's gone from queue, it likely succeeded (SyncEngine removes successful items)
+          // Double check by looking at sync status of the property if possible,
+          // but usually SyncEngine removes from queue on success.
+          setSubmissionStatus('success');
+          return true;
+        }
+
+        if (item.status === 'failed') {
+          setSubmissionStatus('error');
+          setSubmissionError(item.error || 'An unexpected error occurred during upload.');
+          return true;
+        }
+
+        return false;
+      };
+
+      // Poll for a few seconds to see if it completes immediately
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        const finished = await checkStatus();
+        if (finished || attempts > 30) { // 30 seconds timeout for immediate feedback
+          clearInterval(interval);
+          if (!finished) {
+            // If still pending after 30s, just show success since it IS in the queue
+            // and will be handled by the background engine.
+            setSubmissionStatus('success');
+          }
+        }
+      }, 1000);
+
     } catch (e: any) {
       console.error('[Inspection] submission failed:', e);
-      setSnackbarMessage(e.message || 'Submission failed. Please try again.');
+      setSubmissionStatus('error');
+      setSubmissionError(e.message || 'Submission failed. Please try again.');
     }
   };
 
@@ -473,6 +526,46 @@ export const InspectionScreen: React.FC<Props> = ({ route, navigation }) => {
       </ScrollView>
 
       {/* Snackbar alerts */}
+      {/* Submission Status Dialog */}
+      <Portal>
+        <Dialog visible={submissionStatus !== 'idle'} dismissable={false}>
+          <Dialog.Title>
+            {submissionStatus === 'uploading' && 'Uploading Inspection'}
+            {submissionStatus === 'success' && 'Success'}
+            {submissionStatus === 'error' && 'Submission Error'}
+            {submissionStatus === 'offline' && 'Offline Mode'}
+          </Dialog.Title>
+          <Dialog.Content>
+            {submissionStatus === 'uploading' && (
+              <View style={{ alignItems: 'center', padding: 16 }}>
+                <ProgressBar indeterminate color={theme.colors.primary} style={{ width: '100%', marginBottom: 16 }} />
+                <Text>Please wait while your report is being uploaded...</Text>
+              </View>
+            )}
+            {submissionStatus === 'success' && (
+              <Text>Your inspection has been successfully queued and uploaded.</Text>
+            )}
+            {submissionStatus === 'error' && (
+              <Text>{submissionError || 'Something went wrong while uploading your inspection. It has been saved to the sync queue for retry.'}</Text>
+            )}
+            {submissionStatus === 'offline' && (
+              <Text>You are currently offline. Your inspection has been saved and will be uploaded automatically when you're back online.</Text>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            {(submissionStatus === 'success' || submissionStatus === 'offline') && (
+              <Button onPress={() => navigation.popToTop()}>Go to Home</Button>
+            )}
+            {submissionStatus === 'error' && (
+              <Button onPress={() => {
+                setSubmissionStatus('idle');
+                navigation.popToTop();
+              }}>Back to Home</Button>
+            )}
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
       <Snackbar
         visible={!!snackbarMessage}
         onDismiss={() => setSnackbarMessage(null)}

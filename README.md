@@ -39,6 +39,12 @@ The server is the source of truth. If two agents edit the same unit, the server 
 ### 3. Image Handling
 Images are stored as local URIs until synced. I enabled multiple image selection in the inspection screen to speed up the workflow for agents.
 
+### 4. Direct Feedback on Submission
+When an agent completes an inspection, they are no longer left wondering if it worked.
+- **Progress Tracking:** A dialog with a loader appears during upload.
+- **Success/Error States:** The app explicitly confirms successful uploads or details why a submission is pending (e.g., offline or server error).
+- **Navigation:** Clear paths back to the home screen after completion to maintain flow.
+
 ---
 
 ## What was Cut (and Why)
@@ -46,6 +52,7 @@ Images are stored as local URIs until synced. I enabled multiple image selection
 1. **Native Camera UI:** I used `expo-image-picker` instead of building a custom camera UI with `expo-camera`. Building a custom camera that handles all edge cases (aspect ratios, flash, gallery integration) would have taken ~4 hours that I felt were better spent on the sync logic and offline stability.
 2. **Advanced Filtering:** I implemented basic Search and Region/Status filters. More complex filters (by date range or agent assigned) were cut to ensure the core inspection flow was rock solid.
 3. **Automated Conflict Merging:** Currently, a 409 requires manual intervention. In a production app, I would implement field-level merging (e.g., if Agent A changed the living room and Agent B changed the kitchen, both could be merged automatically).
+4. **Real-time Photo Upload Status:** While the inspection report shows an upload loader, individual photo upload progress isn't shown in the dialog (though they are tracked in the background queue).
 
 ---
 
@@ -53,6 +60,7 @@ Images are stored as local URIs until synced. I enabled multiple image selection
 
 1. **Large Image Uploads:** On very low-end devices, selecting 10+ high-res images at once might cause a memory spike during the `FormData` creation.
 2. **Keyboard Avoidance:** In the `InspectionScreen`, the keyboard sometimes obscures the "Next" button on smaller screens despite using `KeyboardAvoidingView` (ongoing tuning).
+3. **Sync Engine Polling:** If the app is force-closed during the 30-second submission poll, the agent won't see the success dialog, though the data remains safe in the persistent queue.
 
 ---
 
