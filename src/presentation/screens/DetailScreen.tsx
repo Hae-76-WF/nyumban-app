@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import {View, StyleSheet, ScrollView, Platform, StatusBar} from 'react-native';
+import {View, StyleSheet, ScrollView, Platform, StatusBar, Image} from 'react-native';
 import { Text, Card, Button, List, Divider, Chip, IconButton, useTheme } from 'react-native-paper';
 import { TopAppBar } from '../components/TopAppBar';
 import { DetailSkeleton } from '../components/Skeleton';
@@ -20,12 +20,16 @@ export const DetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const [property, setProperty] = useState<Property | null>(null);
   const [draft, setDraft] = useState<Inspection | null>(null);
+  const [pendingSync, setPendingSync] = useState<Inspection | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadDetail = async () => {
       setLoading(true);
       try {
+        // Mark as recently viewed
+        await propertyRepository.markAsRecentlyViewed(propertyId);
+
         // Fetch property detail (which loads room configurations)
         const p = await propertyRepository.getPropertyDetail(propertyId);
         setProperty(p);
@@ -33,6 +37,13 @@ export const DetailScreen: React.FC<Props> = ({ route, navigation }) => {
         // Check if there is an active draft inspection
         const activeDraft = await inspectionRepository.getDraft(propertyId);
         setDraft(activeDraft);
+
+        // Check if there is a pending sync inspection
+        const queue = await inspectionRepository.getQueue();
+        const pending = queue.find(q => q.type === 'inspection' && q.payload.propertyId === propertyId);
+        if (pending) {
+          setPendingSync(pending.payload);
+        }
       } catch (err) {
         console.error('[Detail] Error loading detail:', err);
         // Fallback to cache
@@ -78,6 +89,8 @@ export const DetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  const activeInspection = draft || pendingSync;
+
   return (
     <View style={styles.container}>
       <TopAppBar title="Property Profile" onBack={() => navigation.goBack()} />
@@ -97,14 +110,14 @@ export const DetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
 
             <Text style={styles.propName}>{property.name}</Text>
-            <Text style={styles.propAddr}>{property.address}</Text>
+            <Text style={styles.propAddr}>{property.address || 'Address not available'}</Text>
 
             <Divider style={styles.divider} />
 
             <View style={styles.metaRow}>
               <View style={styles.metaCol}>
                 <Text variant="labelMedium" style={styles.metaLabel}>Total Configured Units</Text>
-                <Text style={styles.metaVal}>{property.unitCount}</Text>
+                <Text style={styles.metaVal}>{property.unitCount ?? 'N/A'}</Text>
               </View>
               <View style={styles.metaCol}>
                 <Text variant="labelMedium" style={styles.metaLabel}>Last Assessment Date</Text>
@@ -115,6 +128,58 @@ export const DetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           </Card.Content>
         </Card>
+
+        {/* Inspection Details (In Progress or Pending) */}
+        {activeInspection && (
+          <Card style={styles.card} mode="outlined">
+            <Card.Content>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.sectionTitle}>
+                  {draft ? 'Current Assessment (In Progress)' : 'Completed Assessment (Pending Upload)'}
+                </Text>
+                <Chip icon={draft ? 'progress-wrench' : 'cloud-upload'} textStyle={{ fontSize: 10 }}>
+                  {draft ? 'Draft' : 'Pending'}
+                </Chip>
+              </View>
+              <Text variant="bodySmall" style={styles.sectionSubtitle}>
+                Started: {new Date(activeInspection.completedAt * 1000).toLocaleString()}
+              </Text>
+
+              <Divider style={styles.divider} />
+
+              {activeInspection.rooms.map((room) => {
+                const roomInfo = property.rooms.find(r => r.id === room.roomId);
+                if (!room.condition && !room.notes && room.localPhotos.length === 0) return null;
+
+                return (
+                  <View key={room.roomId} style={{ marginBottom: 16 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text variant="titleSmall">{roomInfo?.label || room.roomId}</Text>
+                      {room.condition && (
+                        <Chip compact style={{ height: 20 }} textStyle={{ fontSize: 9 }}>
+                          {room.condition.toUpperCase()}
+                        </Chip>
+                      )}
+                    </View>
+                    {room.notes ? <Text variant="bodySmall" style={{ marginTop: 4 }}>{room.notes}</Text> : null}
+
+                    {room.localPhotos.length > 0 && (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                        {room.localPhotos.map((photo) => (
+                          <Image
+                            key={photo.id}
+                            source={{ uri: photo.localUri }}
+                            style={styles.detailImage}
+                          />
+                        ))}
+                      </ScrollView>
+                    )}
+                  </View>
+                );
+              })}
+            </Card.Content>
+          </Card>
+        )}
 
         {/* Room layout list */}
         <Card style={styles.card} mode="outlined">
@@ -290,5 +355,12 @@ const styles = StyleSheet.create({
   ctaBtn: {
     borderRadius: 8,
     paddingVertical: 6,
+  },
+  detailImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    marginRight: 8,
+    backgroundColor: '#e2e8f0',
   },
 });

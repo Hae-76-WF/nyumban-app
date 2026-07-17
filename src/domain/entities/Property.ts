@@ -12,8 +12,8 @@ export interface PropertyRoom {
 export interface Property {
   id: string;
   name: string;
-  address: string; // normalized, non-null
-  unitCount: number; // normalized, non-null
+  address: string | null;
+  unitCount: number | null;
   region: PropertyRegion;
   lastInspectedAt: string | null; // ISO 8601 or null
   status: PropertyStatus;

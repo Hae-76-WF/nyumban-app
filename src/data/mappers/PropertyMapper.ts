@@ -5,8 +5,8 @@ import { PropertyDTO } from '../api/dto';
 
 export class PropertyMapper {
   static toDomain(dto: PropertyDTO): Property {
-    const address = dto.address || 'Unknown Address';
-    const unitCount = typeof dto.unit_count === 'number' ? dto.unit_count : 0;
+    const address = dto.address;
+    const unitCount = dto.unit_count;
     const region = (dto.region || 'central') as PropertyRegion;
     const status = (dto.status || 'active') as PropertyStatus;
 
@@ -15,21 +15,21 @@ export class PropertyMapper {
       dto.rooms.forEach((r) => {
         rooms.push({
           id: r.id,
-          label: r.label || `Room ${r.id}`,
-          floor: typeof r.floor === 'number' ? r.floor : 0,
+          label: r.label,
+          floor: r.floor,
         });
       });
     }
 
     return {
       id: dto.id,
-      name: dto.name || 'Unnamed Property',
+      name: dto.name,
       address,
       unitCount,
       region,
       lastInspectedAt: dto.last_inspected_at,
       status,
-      version: dto.version || 0,
+      version: dto.version,
       rooms,
     };
   }

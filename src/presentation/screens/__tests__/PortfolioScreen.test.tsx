@@ -12,6 +12,14 @@ jest.mock('../../../app/di', () => ({
   },
   authRepository: {
     logout: jest.fn(),
+    getAgent: jest.fn().mockResolvedValue({ id: 'agt_1', displayName: 'Test Agent' }),
+  },
+  propertyRepository: {
+    getCachedProperties: jest.fn().mockResolvedValue([]),
+    getRecentlyViewed: jest.fn().mockResolvedValue([]),
+  },
+  inspectionRepository: {
+    getDraft: jest.fn().mockResolvedValue(null),
   },
 }));
 
@@ -62,7 +70,7 @@ describe('PortfolioScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('No properties found matching filters.')).toBeTruthy();
+      expect(getByText('No properties found')).toBeTruthy();
     });
   });
 });

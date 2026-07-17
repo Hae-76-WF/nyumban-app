@@ -5,10 +5,11 @@ import {syncEngine} from '../../sync/SyncEngine';
 import {Wifi, WifiOff} from 'lucide-react-native';
 
 interface TopAppBarProps {
-    title: string;
+    title?: string;
     subtitle?: string;
     onBack?: () => void;
     rightActions?: React.ReactNode;
+    logo?: React.ReactNode;
     elevated?: boolean;
     children?: React.ReactNode;
 }
@@ -18,6 +19,7 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                                                         subtitle,
                                                         onBack,
                                                         rightActions,
+                                                        logo,
                                                         elevated = false,
                                                         children,
                                                     }) => {
@@ -32,15 +34,18 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                 }]}
             >
                 {onBack && <Appbar.BackAction onPress={onBack}/>}
+                {logo && <View style={styles.logoContainer}>{logo}</View>}
                 <Appbar.Content
                     title={
                         <View style={styles.titleRow}>
-                            <Appbar.Content
-                                titleStyle={styles.titleStyle}
-                                title={title}
-                                subtitle={subtitle}
-                                style={styles.contentStyle}
-                            />
+                            {title && (
+                                <Appbar.Content
+                                    titleStyle={styles.titleStyle}
+                                    title={title}
+                                    subtitle={subtitle}
+                                    style={styles.contentStyle}
+                                />
+                            )}
                         </View>
                     }
                 />
@@ -61,6 +66,10 @@ const styles = StyleSheet.create({
     titleRow: {
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    logoContainer: {
+        marginLeft: 16,
+        marginRight: 8,
     },
     titleStyle: {
         fontSize: 18,

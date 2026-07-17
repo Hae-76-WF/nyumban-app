@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import {View, StyleSheet, FlatList, RefreshControl, ScrollView, Platform, StatusBar} from 'react-native';
+import {View, StyleSheet, FlatList, RefreshControl, ScrollView, Platform, StatusBar, SectionList, Image} from 'react-native';
 import {
   Text,
   Searchbar,
@@ -16,18 +16,21 @@ import {
   Portal,
   RadioButton,
   Dialog,
+  Menu,
 } from 'react-native-paper';
 import { TopAppBar } from '../components/TopAppBar';
 import { NetworkBanner } from '../components/NetworkBanner';
 import { PropertyCardSkeleton } from '../components/Skeleton';
 import { getPropertiesUseCase } from '../../app/di';
-import { Property, PropertyRegion, PropertyStatus } from '../../domain/entities/Property';
+import { Property } from '../../domain/entities/Property';
 import { QueueItem } from '../../domain/entities/SyncState';
 import { syncEngine } from '../../sync/SyncEngine';
-import {Icon, WifiIcon, WifiOffIcon} from "lucide-react-native";
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import { authRepository } from '../../app/di';
+import { authRepository, inspectionRepository, propertyRepository } from '../../app/di';
+import { Agent } from '../../domain/entities/Agent';
+import {Inspection} from "../../types";
+import {theme} from "../theme";
 
 type Props = StackScreenProps<RootStackParamList, 'Portfolio'>;
 
@@ -36,17 +39,15 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
 
   // States
   const [properties, setProperties] = useState<Property[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<Property[]>([]);
+  const [drafts, setDrafts] = useState<{ [id: string]: Inspection }>({});
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Search and Filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRegion, setSelectedRegion] = useState<PropertyRegion | 'all'>('all');
-  const [selectedStatus, setSelectedStatus] = useState<PropertyStatus | 'all'>('all');
-
-  // Menus
+  const [selectedRegion, setSelectedRegion] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
 
@@ -56,6 +57,14 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
   const [isSyncing, setIsSyncing] = useState(syncEngine.isEngineSyncing());
   const [showQueuePanel, setShowQueuePanel] = useState(false);
 
+  // Error dialog for upload failures
+  const [errorDialogVisible, setErrorDialogVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Agent & User Menu state
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+
   // Subscribe to updates from the sync engine
   useEffect(() => {
     setIsOnline(syncEngine.isOnline());
@@ -63,8 +72,29 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
       setSyncQueue(queue);
       setIsSyncing(syncEngine.isEngineSyncing());
     });
-    return unsubscribe;
+
+    // Load agent details
+    authRepository.getAgent().then(setAgent);
+
+    unsubscribe();
   }, []);
+
+  // Fetch drafts
+  const loadDrafts = async () => {
+    const cached = await propertyRepository.getCachedProperties();
+    const draftMap: { [id: string]: Inspection } = {};
+    for (const p of cached) {
+      const d = await inspectionRepository.getDraft(p.id);
+      if (d) draftMap[p.id] = d;
+    }
+    setDrafts(draftMap);
+  };
+
+  // Fetch recently viewed
+  const loadRecentlyViewed = async () => {
+    const recent = await propertyRepository.getRecentlyViewed();
+    setRecentlyViewed(recent);
+  };
 
   // Fetch properties helper
   const loadProperties = async (cursor?: string, isLoadMore = false) => {
@@ -77,6 +107,9 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     try {
+      await loadDrafts();
+      await loadRecentlyViewed();
+
       const q = searchQuery.trim() || undefined;
       const region = selectedRegion === 'all' ? undefined : selectedRegion;
       const status = selectedStatus === 'all' ? undefined : selectedStatus;
@@ -158,6 +191,111 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
   const resolveConflict = async (itemId: string, action: 'override' | 'discard', serverVersion?: number) => {
     await syncEngine.resolveConflict(itemId, action, serverVersion);
   };
+
+  const handleForceUpload = async (itemId: string) => {
+    if (!isOnline) {
+      setErrorMessage('No network connection. Please check your internet and try again.');
+      setErrorDialogVisible(true);
+      return;
+    }
+    try {
+      await syncEngine.forceRetry(itemId);
+    } catch (e: any) {
+      setErrorMessage(e.message || 'Force upload failed.');
+      setErrorDialogVisible(true);
+    }
+  };
+
+  const handleLogout = async () => {
+    setLogoutDialogVisible(false);
+    await authRepository.logout();
+    navigation.replace('Login');
+  };
+
+  const renderPropertyItem = (item: Property) => {
+    const draft = drafts[item.id];
+    const pendingSync = syncQueue.find(q => q.type === 'inspection' && q.payload.propertyId === item.id);
+    const isCompleted = !!item.lastInspectedAt && !pendingSync;
+
+    return (
+      <Card
+        id={`property-card-${item.id}`}
+        style={styles.propCard}
+        mode="contained"
+        onPress={() => navigation.navigate('Detail', { propertyId: item.id })}
+      >
+        <Card.Content>
+          <View style={styles.propRow}>
+            <View style={styles.propMain}>
+              <Text variant="titleMedium" style={styles.propName}>
+                {item.name}
+              </Text>
+              <Text variant="bodySmall" style={styles.propAddr}>
+                {item.address || 'Address not available'}
+              </Text>
+              <View style={styles.badgeRow}>
+                <Chip style={styles.badgeChip} textStyle={styles.chipText}>
+                  {item.unitCount ?? 'N/A'} {item.unitCount === 1 ? 'unit' : 'units'}
+                </Chip>
+                <Chip style={[styles.badgeChip, { backgroundColor: getStatusColor(item.status) }]} textStyle={[styles.chipText, { color: '#fff' }]}>
+                  {getRegionLabel(item.status)}
+                </Chip>
+              </View>
+
+              <View style={{ marginTop: 8, flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                {draft && (
+                  <Chip icon="progress-wrench" style={{ backgroundColor: '#fff7ed' }} textStyle={{ color: '#c2410c', fontSize: 10 }}>
+                    In Progress
+                  </Chip>
+                )}
+                {pendingSync && (
+                  <Chip icon="cloud-upload" style={{ backgroundColor: '#f0f9ff' }} textStyle={{ color: '#0369a1', fontSize: 10 }}>
+                    Pending Upload
+                  </Chip>
+                )}
+                {isCompleted && (
+                  <Chip icon="check-circle" style={{ backgroundColor: '#f0fdf4' }} textStyle={{ color: '#15803d', fontSize: 10 }}>
+                    Completed
+                  </Chip>
+                )}
+              </View>
+            </View>
+
+            <View style={{ alignItems: 'flex-end', justifyContent: 'space-between' }}>
+              <View>
+                <Text>{getRegionLabel(item.region)}</Text>
+              </View>
+
+              {pendingSync && (
+                <Button
+                  mode="outlined"
+                  compact
+                  onPress={() => handleForceUpload(pendingSync.id)}
+                  style={{ marginTop: 8 }}
+                  labelStyle={{ fontSize: 10 }}
+                >
+                  Force Upload
+                </Button>
+              )}
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  const sections = [
+    { title: 'Pending Upload Online', data: properties.filter(p => syncQueue.some(q => q.type === 'inspection' && q.payload.propertyId === p.id)) },
+    { title: 'Inspection In Progress', data: properties.filter(p => !!drafts[p.id]) },
+    { title: 'Recently Completed', data: properties.filter(p => !!p.lastInspectedAt && !syncQueue.some(q => q.type === 'inspection' && q.payload.propertyId === p.id)) },
+    { title: 'Recently Viewed', data: recentlyViewed },
+    { title: 'All Properties', data: properties },
+  ].filter(s => s.data.length > 0);
+
+  // We want to avoid duplicates in 'All Properties' if they are in other sections?
+  // Actually, usually user wants to see them in sections AND maybe all.
+  // But the prompt says "different section for...", let's make them unique-ish or just sections.
+  // Using SectionList is better.
 
   return (
     <View style={styles.container}>
@@ -285,14 +423,52 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Header and Controls */}
       <TopAppBar
-        title="Nyumban Properties"
-        rightActions={
-          <IconButton
-            id="workspace-logout-button"
-            icon="logout"
-            size={24}
-            onPress={() => setLogoutDialogVisible(true)}
+        logo={
+        <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center'}}>
+          <Image
+              source={require('../../../assets/logo.png')}
+              style={{ width: 40, height: 40, resizeMode: 'contain' }}
           />
+          <Text style={styles.headerTitle}>
+            Nyumban Properties
+          </Text>
+        </View>
+
+        }
+        rightActions={
+          <Menu
+            visible={menuVisible}
+            onDismiss={() => setMenuVisible(false)}
+            anchor={
+              <IconButton
+                icon="account-circle"
+                size={28}
+                onPress={() => setMenuVisible(true)}
+              />
+            }
+          >
+            <View style={{ padding: 16, minWidth: 200 }}>
+              <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
+                {agent?.displayName || 'Agent'}
+              </Text>
+              <Text variant="bodySmall" style={{ color: '#64748b', marginTop: 4 }}>
+                Region: {agent?.assignedRegion ? getRegionLabel(agent.assignedRegion) : 'N/A'}
+              </Text>
+              <Divider style={{ marginVertical: 12 }} />
+              <Button
+                mode="outlined"
+                icon="logout"
+                onPress={() => {
+                  setMenuVisible(false);
+                  setLogoutDialogVisible(true);
+                }}
+                textColor={theme.colors.error}
+                style={{ borderColor: theme.colors.error }}
+              >
+                Logout
+              </Button>
+            </View>
+          </Menu>
         }
       >
         <View style={[styles.searchHeader]}>
@@ -392,97 +568,57 @@ export const PortfolioScreen: React.FC<Props> = ({ navigation }) => {
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setLogoutDialogVisible(false)}>Cancel</Button>
-            <Button onPress={async () => {
-              setLogoutDialogVisible(false);
-              await authRepository.logout();
-              navigation.replace('Login');
-            }}>Logout</Button>
+            <Button onPress={handleLogout} textColor={theme.colors.error}>Logout</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog visible={errorDialogVisible} onDismiss={() => setErrorDialogVisible(false)}>
+          <Dialog.Title>Upload Failed</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">{errorMessage}</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setErrorDialogVisible(false)}>OK</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
 
-      {/* Main FlatList */}
+      {/* Main SectionList */}
       {
         loading ? (
             <FlatList
                 data={[1,2,3,4,5,6,7]}
                 keyExtractor={(item, index) => `skeleton-${index}`}
-                renderItem={({ item }) => {
-                    return <PropertyCardSkeleton />;
-                }}
+                renderItem={() => <PropertyCardSkeleton />}
                 refreshControl={
                   <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} />
                 }
                 onEndReachedThreshold={0.4}
                 contentContainerStyle={styles.listContent}
             />
-
           ) : (
-            <FlatList
-                data={properties}
-                keyExtractor={(item, index) => item.id}
-                renderItem={({ item }) => {
-                  return (
-                      <Card
-                          id={`property-card-${item.id}`}
-                          style={styles.propCard}
-                          mode="contained"
-                          onPress={() => navigation.navigate('Detail', { propertyId: item.id })}
-                      >
-                        <Card.Content>
-                          <View style={styles.propRow}>
-                            <View style={styles.propMain}>
-                              <Text variant="titleMedium" style={styles.propName}>
-                                {item.name}
-                              </Text>
-                              <Text variant="bodySmall" style={styles.propAddr}>
-                                {item.address}
-                              </Text>
-                              <View style={styles.badgeRow}>
-                                <Chip style={styles.badgeChip} textStyle={styles.chipText}>
-                                  {item.unitCount} {item.unitCount === 1 ? 'unit' : 'units'}
-                                </Chip>
-                                <Chip style={styles.badgeChip} textStyle={styles.chipText}>
-                                  {getRegionLabel(item.region)}
-                                </Chip>
-                              </View>
-                            </View>
-
-                            <View style={styles.propRight}>
-                              <Text
-                                  variant="bodySmall"
-                                  style={[styles.statusText, { color: getStatusColor(item.status) }]}
-                              >
-                                ● {item.status.toUpperCase()}
-                              </Text>
-                              {item.lastInspectedAt && (
-                                  <Text variant="labelSmall" style={styles.lastInspected}>
-                                    Last: {new Date(item.lastInspectedAt).toLocaleDateString()}
-                                  </Text>
-                              )}
-                            </View>
-                          </View>
-                        </Card.Content>
-                      </Card>
-                  );
-                }}
-                ListEmptyComponent={
-                  !loading ? (
-                      <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>
-                          No properties found matching filters.
-                        </Text>
-                      </View>
-                  ) : null
-                }
-                refreshControl={
-                  <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} />
-                }
-                onEndReached={handleLoadMore}
-                onEndReachedThreshold={0.4}
-                contentContainerStyle={styles.listContent}
+            <SectionList
+              sections={sections}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => renderPropertyItem(item)}
+              renderSectionHeader={({ section: { title } }) => (
+                <Text variant="labelMedium" style={styles.sectionHeader}>{title}</Text>
+              )}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} />
+              }
+              onEndReached={handleLoadMore}
+              onEndReachedThreshold={0.4}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text variant="titleMedium" style={styles.emptyText}>No properties found</Text>
+                  <Button mode="outlined" onPress={() => loadProperties()} style={{ marginTop: 12 }}>
+                    Reload
+                  </Button>
+                </View>
+              }
             />
-
         )
       }
 
@@ -696,6 +832,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
   },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8fafc',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontWeight: 'bold',
+  },
   statusText: {
     fontSize: 11,
     fontWeight: 'bold',
@@ -711,5 +856,10 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#94a3b8',
     textAlign: 'center',
+  },
+  headerTitle: {
+    color: theme.colors.secondary,
+    fontWeight: 'bold',
+    fontSize: 18
   },
 });

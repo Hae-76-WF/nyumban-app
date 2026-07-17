@@ -48,4 +48,14 @@ export class PropertyRepositoryImpl implements PropertyRepository {
   async updateCachedProperty(property: Property): Promise<void> {
     await localDB.updateCachedProperty(property);
   }
+
+  async getRecentlyViewed(): Promise<Property[]> {
+    const ids = localDB.getRecentlyViewedIds();
+    const cached = localDB.getCachedProperties();
+    return ids.map(id => cached.find(p => p.id === id)).filter((p): p is Property => !!p);
+  }
+
+  async markAsRecentlyViewed(id: string): Promise<void> {
+    await localDB.addRecentlyViewed(id);
+  }
 }

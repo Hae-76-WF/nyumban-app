@@ -7,6 +7,7 @@ class LocalStorageDB {
   private syncQueue: QueueItem[] = [];
   private agent: Agent | null = null;
   private drafts: Map<string, Inspection> = new Map();
+  private recentlyViewedIds: string[] = [];
   private isInitialized = false;
 
   private getKey(name: string): string {
@@ -19,15 +20,17 @@ class LocalStorageDB {
   public async initialize(): Promise<void> {
     if (this.isInitialized) return;
     try {
-      const [propsData, queueData, agentData] = await Promise.all([
+      const [propsData, queueData, agentData, recentData] = await Promise.all([
         AsyncStorage.getItem(this.getKey('properties')),
         AsyncStorage.getItem(this.getKey('sync_queue')),
-        AsyncStorage.getItem(this.getKey('agent_profile'))
+        AsyncStorage.getItem(this.getKey('agent_profile')),
+        AsyncStorage.getItem(this.getKey('recently_viewed'))
       ]);
 
       if (propsData) this.properties = JSON.parse(propsData);
       if (queueData) this.syncQueue = JSON.parse(queueData);
       if (agentData) this.agent = JSON.parse(agentData);
+      if (recentData) this.recentlyViewedIds = JSON.parse(recentData);
 
       // Load any existing draft keys
       const keys = await AsyncStorage.getAllKeys();
@@ -74,6 +77,16 @@ class LocalStorageDB {
       this.properties.push(property);
     }
     await AsyncStorage.setItem(this.getKey('properties'), JSON.stringify(this.properties));
+  }
+
+  // --- RECENTLY VIEWED ---
+  public getRecentlyViewedIds(): string[] {
+    return this.recentlyViewedIds;
+  }
+
+  public async addRecentlyViewed(id: string): Promise<void> {
+    this.recentlyViewedIds = [id, ...this.recentlyViewedIds.filter(i => i !== id)].slice(0, 10);
+    await AsyncStorage.setItem(this.getKey('recently_viewed'), JSON.stringify(this.recentlyViewedIds));
   }
 
   // --- ACTIVE INSPECTION DRAFT ---
